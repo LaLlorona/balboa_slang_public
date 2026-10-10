@@ -27,13 +27,20 @@ bool IsInsideCircleStroke(RWTexture2D<float4> image, uint2 tid, Circle circle, b
     float yCoordinate =  height - (tid.y + 0.5);
     float2 pixelCoordinate = float2(xCoordinate, yCoordinate);
     float distanceFromCircleCenter = distance(circle.center, pixelCoordinate);
-    if (distanceFromCircleCenter > circle.radius - circle.radius / 2 && distanceFromCircleCenter <= strokeWidth + circle.radius / 2) {
+    if (distanceFromCircleCenter > circle.radius - strokeWidth / 2 && distanceFromCircleCenter <= circle.radius + strokeWidth / 2) {
         return true;
     }
     return false;
 }
 
-bool IsInsidePolyline(RWTexture2D<float4> image, uint2 tid, StructuredBuffer<float2> polylineCoordinates, bool useFill, bool isClosed) {
+bool IsInsidePolyline(
+    RWTexture2D<float4> image,
+    uint2 tid,
+    StructuredBuffer<float2> polylineCoordinates,
+    int startIndexInclusive,
+    int endIndexExclusive, 
+    bool useFill,
+    bool isClosed) {
     if (useFill == false) {
         return false;
     }
@@ -41,12 +48,13 @@ bool IsInsidePolyline(RWTexture2D<float4> image, uint2 tid, StructuredBuffer<flo
     image.GetDimensions(width, height);
     float xCoordinate = tid.x + 0.5;
     float yCoordinate = height - (tid.y + 0.5);
+    int startIndex = startIndexInclusive;
+    int endIndex = isClosed ? endIndexExclusive - 1 : endIndexExclusive - 2;
     float2 q = float2(xCoordinate, yCoordinate);
-    int endIndex = isClosed ? polylineCoordinates.getCount() : polylineCoordinates.getCount() - 1;
     int count = 0;
-    for (int i = 0; i < endIndex; i++) {
+    for (int i = startIndex; i <= endIndex; i++) {
         float2 firstPoint = polylineCoordinates[i];
-        float2 secondPoint = polylineCoordinates[(i+1) % polylineCoordinates.getCount()];
+        float2 secondPoint = polylineCoordinates[i==endIndexExclusive - 1 ? startIndex : (i+1)];
         float smallerY = min(firstPoint.y, secondPoint.y);
         float largerY = max(firstPoint.y, secondPoint.y);
         if (yCoordinate > smallerY && yCoordinate <=largerY) {
@@ -68,7 +76,14 @@ bool IsInsidePolyline(RWTexture2D<float4> image, uint2 tid, StructuredBuffer<flo
     return false;
 }
 
-bool IsInsidePolylineStroke(RWTexture2D<float4> image, uint2 tid, StructuredBuffer<float2> polylineCoordinates, bool useStroke, bool isClosed, float strokeWidth) {
+bool IsInsidePolylineStroke(
+    RWTexture2D<float4> image,
+    uint2 tid, StructuredBuffer<float2> polylineCoordinates,
+    int startIndexInclusive,
+    int endIndexExclusive, 
+    bool useStroke,
+    bool isClosed,
+    float strokeWidth) {
     if (useStroke == false) {
         return false;
     }
@@ -76,11 +91,12 @@ bool IsInsidePolylineStroke(RWTexture2D<float4> image, uint2 tid, StructuredBuff
     image.GetDimensions(width, height);
     float xCoordinate = tid.x + 0.5;
     float yCoordinate = height - (tid.y + 0.5);
+    int startIndex = startIndexInclusive;
+    int endIndex = isClosed ? endIndexExclusive - 1 : endIndexExclusive - 2;
     float2 q = float2(xCoordinate, yCoordinate);
-    int endIndex = isClosed ? polylineCoordinates.getCount() : polylineCoordinates.getCount() - 1;
-    for (int i = 0; i < endIndex; i++) {
+    for (int i = startIndex; i <= endIndex; i++) {
         float2 p0 = polylineCoordinates[i];
-        float2 p1 = polylineCoordinates[(i+1) % polylineCoordinates.getCount()];
+        float2 p1 = polylineCoordinates[i==endIndexExclusive - 1 ? startIndex : (i+1)];
         float2 p1MinusP0 = p1 - p0;
         float2 qMinusP0 = q - p0;
         float distanceFromP0ToP1 = distance(p0, p1);
@@ -91,7 +107,7 @@ bool IsInsidePolylineStroke(RWTexture2D<float4> image, uint2 tid, StructuredBuff
             && distanceFromP0ToProjectionOfQ < distanceFromP0ToP1
             && distance(q, projectionOfQOnP0P1) < strokeWidth / 2;
 
-        bool isPointInsideRoundJoin = (isClosed ||i >= 1) && distance(p0, q) <=strokeWidth / 2;
+        bool isPointInsideRoundJoin = (isClosed || i >= startIndex + 1) && distance(p0, q) <=strokeWidth / 2;
         if (isPointInsideStorkeWidth ||isPointInsideRoundJoin) {
             return true;
         }
@@ -116,7 +132,7 @@ void compute_main(uint2 tid : SV_DispatchThreadID,
         return;
     }
     image[tid] = float4(background, 1);
-    for (int i = 0; i < shapes.getCount(); i++) {
+    for (int i = shapes.getCount() - 1; i >=0 ; i--) {
         Shape currentShape = shapes[i];
         switch (currentShape.type) {
             case ShapeType.Circle :
@@ -129,6 +145,13 @@ void compute_main(uint2 tid : SV_DispatchThreadID,
                 }
                 break;
             case ShapeType.Polyline:
+                Polyline polyline = polylines[currentShape.index];
+                if (IsInsidePolyline(image,tid, points, polyline.pts_begin, polyline.pts_end, currentShape.use_fill, polyline.closed)) {
+                    image[tid] = currentShape.fill_rgba;
+                }
+                if (IsInsidePolylineStroke(image,tid, points, polyline.pts_begin, polyline.pts_end, currentShape.use_stroke, polyline.closed, currentShape.stroke_width)) {
+                    image[tid] = currentShape.stroke_rgba;
+                }
                 break;
         }
     }
