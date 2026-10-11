@@ -1,4 +1,6 @@
 import json
+from configparser import Interpolation
+
 import slangpy as spy
 import numpy as np
 import buffer
@@ -224,12 +226,49 @@ def compose_transformation(transforms):
             
 
     return F
+Transform = dict[str, list[float]]
+KeyFrame = dict
 
-def interpolate_transformation(transform_keyframes, t):
+def interpolate_transformation(transform_keyframes : list[KeyFrame], t: float) -> list[Transform]:
     # TODO: your code here
+    
+    start_time : float = transform_keyframes[0]['time']
+    end_time : float = transform_keyframes[len(transform_keyframes)-1]['time']
 
-    # Should never happen?
-    assert False
+    result : list[Transform] = []
+
+    if t <= start_time or t >= end_time :
+        edgeIndex : int = 0 if t <= start_time else len(transform_keyframes) - 1
+        edgeTransform : list[Transform] = transform_keyframes[edgeIndex]['transform']
+        for item in edgeTransform:
+            for name, values in item.items():
+                result.append({name : list(values)})
+        return result
+
+    interpolationStartIndex : int = 0
+    for i in range(0, len(transform_keyframes) - 1, 1):
+        intervalStartTime : float = transform_keyframes[i]['time']
+        intervalEndTime : float = transform_keyframes[i + 1]['time']
+        if intervalStartTime <= t and t < intervalEndTime :
+            interpolationStartIndex = i
+            break
+
+    interpolationStartInfo = transform_keyframes[interpolationStartIndex]
+    interpolationEndInfo = transform_keyframes[interpolationStartIndex + 1]
+    interpolationValue : float = (t - interpolationStartInfo['time']) / (interpolationEndInfo['time'] - interpolationStartInfo['time'])
+    startTransformInfo : Transform
+    endTransformInfo : Transform
+    for startTransformInfo, endTransformInfo in zip(interpolationStartInfo['transform'], interpolationEndInfo['transform']) :
+        name : str
+        values : list[float]
+        for name, values in startTransformInfo.items():
+            endValues : list[float] = endTransformInfo[name]
+            new_values : list[float] = []
+            for j in range(len(values)):
+                interp : float = (1 - interpolationValue) * values[j] + interpolationValue * endValues[j]
+                new_values.append(interp)
+            result.append({name : new_values})
+    return result
 
 def upload_scene(scene, module, slang_device, t=0.0):
     # Keyframe parameters are interpolated on the CPU;
