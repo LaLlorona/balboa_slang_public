@@ -99,6 +99,7 @@ def add_curves(obj, new_points, closed,
         'closed': closed,
     })
 
+
     shapes.append({
         'type': shape_type,
         'index': len(curves) - 1,
@@ -190,8 +191,37 @@ def compose_transformation(transforms):
     F = np.eye(3, dtype=np.float32)
 
     for transform in transforms:
-        pass
-        # TODO: your code here
+        (transformType, transformValue), = transform.items()
+        
+        if (transformType == 'scale'):
+            scaleMatrix = np.eye(3, dtype = np.float32)
+            scaleMatrix[0, 0] = transformValue[0]
+            scaleMatrix[1, 1] = transformValue[1]
+            F = scaleMatrix @ F
+        if (transformType == 'shear_x'):
+            shearXMatrix = np.eye(3, dtype = np.float32)
+            shearXMatrix[0, 1] = transformValue[0]
+            F = shearXMatrix @ F
+
+        if (transformType == 'shear_y'):
+            shearYMatrix = np.eye(3, dtype = np.float32)
+            shearYMatrix[1, 0] = transformValue[0]
+            F = shearYMatrix @ F
+
+        if (transformType == 'rotate'):
+            rotateMatrix = np.eye(3, dtype = np.float32)
+            rotateMatrix[0, 0] = np.cos(math.radians(transformValue[0]))
+            rotateMatrix[0, 1] = -np.sin(math.radians(transformValue[0]))
+            rotateMatrix[1, 0] = np.sin(math.radians(transformValue[0]))
+            rotateMatrix[1, 1] = np.cos(math.radians(transformValue[0]))
+            F = rotateMatrix @ F
+
+        if (transformType == 'translate'):
+            translateMatrix = np.eye(3, dtype = np.float32)
+            translateMatrix[0, 2] = transformValue[0]
+            translateMatrix[1, 2] = transformValue[1]
+            F = translateMatrix @ F
+            
 
     return F
 
