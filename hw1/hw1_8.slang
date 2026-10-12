@@ -145,7 +145,7 @@ bool IsInsideBezier(
     {
         float2 p0 = bezierCoordinate[i];
         float2 p1 = bezierCoordinate[i + 1];
-        float2 p2 = bezierCoordinate[i == endIndexExclusive - 2 ? 0 : i + 2];
+        float2 p2 = bezierCoordinate[i == endIndexExclusive - 2 ? startIndex : i + 2];
         float a = p0.y - 2 * p1.y + p2.y;
         float b = 2 * (p1.y - p0.y);
         float c = p0.y - canvasCoordinate.y;
@@ -212,7 +212,7 @@ bool IsInsideBezierStroke(
     {
         float2 p0 = bezierCoordinate[i];
         float2 p1 = bezierCoordinate[i + 1];
-        float2 p2 = bezierCoordinate[i == endIndexExclusive - 2 ? 0 : i + 2];
+        float2 p2 = bezierCoordinate[i == endIndexExclusive - 2 ? startIndex : i + 2];
 
         // q(t) = at^2 + bt + c
         // q'(t) = 2at + b
