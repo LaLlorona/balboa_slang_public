@@ -10,4 +10,4 @@ This is UCSD CSE 167 homework (Balboa/Slang 2D renderer). The course language-mo
 - When the user first asks a question, do not provide code right away. Provide code only if the user explicitly asks for it in a follow-up request.
 
 ## Homework Info
-- Homework details can be found in `C:\myfiles\UCSD\quarter1\ComputerGraphics\balboa_slang_public\hw1\homework1.pdf`.
+- Homework details can be found in "C:\myfiles\UCSD\quarter1\ComputerGraphics\balboa_slang_public\homework2.pdf".

@@ -20,15 +20,22 @@ def hw2_1(args):
     def to_screen(p):
         # HW2.1: implement this
         # access "s" using args.s
-        return (0.0, 0.0)
+        x = p[0]
+        y = p[1]
+        z = p[2]
+        xPrime = -x/z
+        yPrime = -y/z
+        xPrimePrime = img.width * (xPrime + args.s * a ) / (2 * args.s * a)
+        yPrimePrime = img.height * (args.s - yPrime) / (2*args.s)
+        return (xPrimePrime, yPrimePrime)
 
     sp0 = to_screen(args.p0)
     sp1 = to_screen(args.p1)
     sp2 = to_screen(args.p2)
 
     # HW2.1: implement this
-    aabb_min = (0, 0)
-    aabb_max = (10, 10)
+    aabb_min = (math.floor(min(sp0[0],sp1[0], sp2[0])), math.floor(min(sp0[1],sp1[1], sp2[1]))) 
+    aabb_max = (math.ceil(max(sp0[0],sp1[0], sp2[0])), math.ceil(max(sp0[1],sp1[1], sp2[1])))
 
     vars = {'sp0': sp0,
             'sp1': sp1,
