@@ -1,14 +1,4 @@
-bool IsInsidePolyline(
-    RWTexture2D<float4> image,
-    float2 canvasCoordinate,
-    StructuredBuffer<float2> polylineCoordinates,
-    int startIndexInclusive,
-    int endIndexExclusive,
-    bool useFill,
-    bool isClosed)
-{
-    return true;
-}
+
 
 [shader("compute")]
 [numthreads(8, 8, 1)]

@@ -84,9 +84,21 @@ def hw2_2(args):
 
     mesh = hw2_scene.parse_triangle_mesh(args.mesh)
 
+    # def to_screen(p):
+    #     # HW2.2: implement this (basically the same as HW2.1)
+    #     return (0.0, 0.0)
+
     def to_screen(p):
-        # HW2.2: implement this (basically the same as HW2.1)
-        return (0.0, 0.0)
+        # HW2.1: implement this
+        # access "s" using args.s
+        x = p[0]
+        y = p[1]
+        z = p[2]
+        xPrime = -x/z
+        yPrime = -y/z
+        xPrimePrime = args.width * (xPrime + args.s * a ) / (2 * args.s * a)
+        yPrimePrime = args.height * (args.s - yPrime) / (2*args.s)
+        return (xPrimePrime, yPrimePrime)
 
     # splat the triangles onto the screen
     screen_vertices = [to_screen(mesh.vertices[vid, :]) for vid in range(mesh.vertices.shape[0])]
@@ -111,7 +123,31 @@ def hw2_2(args):
             # aabb_min & aabb_max like in 2.1
             # c0, c1, c2 from mesh.vertex_colors
             # use mesh.faces[tri_id] to obtain the vertex indices
+            
 
+            sp0VertexIndex = mesh.faces[tri_id][0]
+            sp1VertexIndex = mesh.faces[tri_id][1]
+            sp2VertexIndex = mesh.faces[tri_id][2]
+            
+            
+            sp0 = screen_vertices[sp0VertexIndex]
+            sp1 = screen_vertices[sp1VertexIndex]
+            sp2 = screen_vertices[sp2VertexIndex]
+            
+
+            
+            inv_depth0 = 1 / -mesh.vertices[sp0VertexIndex][2]
+            inv_depth1 = 1 / -mesh.vertices[sp1VertexIndex][2]
+            inv_depth2 = 1 / -mesh.vertices[sp2VertexIndex][2]
+            
+            c0 = mesh.vertex_colors[sp0VertexIndex]
+            c1 = mesh.vertex_colors[sp1VertexIndex]
+            c2 = mesh.vertex_colors[sp2VertexIndex]
+
+            aabb_min = (math.floor(min(sp0[0],sp1[0], sp2[0])), math.floor(min(sp0[1],sp1[1], sp2[1])))
+            aabb_max = (math.ceil(max(sp0[0],sp1[0], sp2[0])), math.ceil(max(sp0[1],sp1[1], sp2[1])))
+            
+            
             if aabb_min[0] > aabb_max[0] or aabb_min[1] > aabb_max[1]:
                 continue
 
@@ -136,7 +172,7 @@ def hw2_2(args):
                 depth_image=depth_image,
                 **shade_vars
             )
-            # Synchronize to avoid race conditions on the depth buffer
+
             command_encoder.global_barrier()
 
     if args.output == None:
