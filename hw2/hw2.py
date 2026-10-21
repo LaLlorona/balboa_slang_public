@@ -203,10 +203,17 @@ def hw2_3(args):
     # HW 2.3: implement this
     # change np.zeros into the right matrices
     projection = np.zeros((4, 4), dtype=np.float32)
+    projection[0][0] = 1;
+    projection[1][1] = 1;
+    projection[2][3] = 1;
+    projection[3][2] = -1;
     camera_to_screen = np.zeros((4, 4), dtype=np.float32)
     # use camera.cam_to_world
+    print(camera.cam_to_world)
     view_matrix = np.zeros((4, 4), dtype=np.float32)
     world_to_screen = np.zeros((4, 4), dtype=np.float32)
+
+    
     
     screen_vertices_list = []
     inv_depth_list = []
@@ -214,7 +221,7 @@ def hw2_3(args):
         # HW 2.3: implement this
         # change np.zeros into the right matrix
         # use mesh.model_matrix
-        MVP = np.zeros((4, 4), dtype=np.float32)
+        MVP = camera_to_screen @ world_to_screen
         ones = np.ones((mesh.vertices.shape[0], 1), dtype=mesh.vertices.dtype)
         vertices = np.concatenate(
             [mesh.vertices, ones],
@@ -244,6 +251,7 @@ def hw2_3(args):
             depth_image,
             clear_value=spy.float4(float("inf"), 0.0, 0.0, 0.0)
         )
+        # print(scene.meshes)
         for mesh_id in range(len(scene.meshes)):
             mesh = scene.meshes[mesh_id]
             screen_vertices = screen_vertices_list[mesh_id]
@@ -251,6 +259,27 @@ def hw2_3(args):
             for tri_id in range(mesh.faces.shape[0]):
                 # HW 2.3: implement this
                 # (basically the same as HW 2.2)
+                sp0VertexIndex = mesh.faces[tri_id][0]
+                sp1VertexIndex = mesh.faces[tri_id][1]
+                sp2VertexIndex = mesh.faces[tri_id][2]
+                
+                
+                sp0 = screen_vertices[sp0VertexIndex]
+                sp1 = screen_vertices[sp1VertexIndex]
+                sp2 = screen_vertices[sp2VertexIndex]
+                
+
+                
+                inv_depth0 = 1 / -mesh.vertices[sp0VertexIndex][2]
+                inv_depth1 = 1 / -mesh.vertices[sp1VertexIndex][2]
+                inv_depth2 = 1 / -mesh.vertices[sp2VertexIndex][2]
+                
+                c0 = mesh.vertex_colors[sp0VertexIndex]
+                c1 = mesh.vertex_colors[sp1VertexIndex]
+                c2 = mesh.vertex_colors[sp2VertexIndex]
+
+                aabb_min = (math.floor(min(sp0[0],sp1[0], sp2[0])), math.floor(min(sp0[1],sp1[1], sp2[1])))
+                aabb_max = (math.ceil(max(sp0[0],sp1[0], sp2[0])), math.ceil(max(sp0[1],sp1[1], sp2[1])))
 
                 if aabb_min[0] > aabb_max[0] or aabb_min[1] > aabb_max[1]:
                     continue

@@ -187,8 +187,45 @@ def compose_transformations(transformations):
     F = np.eye(4, dtype=np.float32)
 
     for transform in transformations:
-        pass
-        # HW 2.3 TODO: your code here
+        (transformType, transformValue), = transform.items()
+        
+        if (transformType == 'scale'):
+            scaleMatrix = np.eye(4, dtype = np.float32)
+            scaleMatrix[0, 0] = transformValue[0]
+            scaleMatrix[1, 1] = transformValue[1]
+            scaleMatrix[2, 2] = transformValue[2]
+            F = scaleMatrix @ F
+
+        if (transformType == 'rotate_x'):
+            rotateMatrix = np.eye(4, dtype = np.float32)
+            rotateMatrix[1, 1] = np.cos(math.radians(transformValue[0]))
+            rotateMatrix[1, 2] = -np.sin(math.radians(transformValue[0]))
+            rotateMatrix[2, 1] = np.sin(math.radians(transformValue[0]))
+            rotateMatrix[2, 2] = np.cos(math.radians(transformValue[0]))
+            F = rotateMatrix @ F
+        if (transformType == 'rotate_y'):
+            rotateMatrix = np.eye(4, dtype = np.float32)
+            rotateMatrix[0, 0] = np.cos(math.radians(transformValue[0]))
+            rotateMatrix[0, 2] = np.sin(math.radians(transformValue[0]))
+            rotateMatrix[2, 0] = -np.sin(math.radians(transformValue[0]))
+            rotateMatrix[2, 2] = np.cos(math.radians(transformValue[0]))
+            F = rotateMatrix @ F
+        if (transformType == 'rotate_z'):
+            rotateMatrix = np.eye(4, dtype = np.float32)
+            rotateMatrix[0, 0] = np.cos(math.radians(transformValue[0]))
+            rotateMatrix[0, 1] = -np.sin(math.radians(transformValue[0]))
+            rotateMatrix[1, 0] = np.sin(math.radians(transformValue[0]))
+            rotateMatrix[1, 1] = np.cos(math.radians(transformValue[0]))
+            F = rotateMatrix @ F
+
+
+        if (transformType == 'translate'):
+            translateMatrix = np.eye(4, dtype = np.float32)
+            translateMatrix[0, 3] = transformValue[0]
+            translateMatrix[1, 3] = transformValue[1]
+            translateMatrix[2, 3] = transformValue[1]
+            F = translateMatrix @ F
+            
 
     return F
 
