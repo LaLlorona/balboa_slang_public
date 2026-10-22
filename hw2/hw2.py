@@ -340,16 +340,54 @@ def hw2_3(args):
         slang_device.wait_for_submit(submit_id)
         image.save_png(args.output, color_image.to_numpy())
 
-def interpolate_transformation(transform_keyframes, t):
-    # HW 2.4: implement this
-    # Find the two keyframes surrounding t and linearly
-    # interpolate the corresponding transformation parameters.
-    #
-    # Return a list of transformations in the same format
-    # as the "transform" field in the scene JSON.
-    interp_transforms = []
 
-    return interp_transforms
+
+Transform = dict[str, list[float]]
+KeyFrame = dict
+
+def interpolate_transformation(transform_keyframes : list[KeyFrame], t: float) -> list[Transform]:
+    # TODO: your code here
+    if (len(transform_keyframes) == 0):
+        return []
+    
+
+    start_time : float = transform_keyframes[0]['time']
+    end_time : float = transform_keyframes[len(transform_keyframes)-1]['time']
+
+    result : list[Transform] = []
+
+    if t <= start_time or t >= end_time :
+        edgeIndex : int = 0 if t <= start_time else len(transform_keyframes) - 1
+        edgeTransform : list[Transform] = transform_keyframes[edgeIndex]['transform']
+        for item in edgeTransform:
+            for name, values in item.items():
+                result.append({name : list(values)})
+        return result
+
+    interpolationStartIndex : int = 0
+    for i in range(0, len(transform_keyframes) - 1, 1):
+        intervalStartTime : float = transform_keyframes[i]['time']
+        intervalEndTime : float = transform_keyframes[i + 1]['time']
+        if intervalStartTime <= t and t < intervalEndTime :
+            interpolationStartIndex = i
+            break
+
+    interpolationStartInfo = transform_keyframes[interpolationStartIndex]
+    interpolationEndInfo = transform_keyframes[interpolationStartIndex + 1]
+    interpolationValue : float = (t - interpolationStartInfo['time']) / (interpolationEndInfo['time'] - interpolationStartInfo['time'])
+    startTransformInfo : Transform
+    endTransformInfo : Transform
+    for startTransformInfo, endTransformInfo in zip(interpolationStartInfo['transform'], interpolationEndInfo['transform']) :
+        name : str
+        values : list[float]
+        for name, values in startTransformInfo.items():
+            endValues : list[float] = endTransformInfo[name]
+            new_values : list[float] = []
+            for j in range(len(values)):
+                interp : float = (1 - interpolationValue) * values[j] + interpolationValue * endValues[j]
+                new_values.append(interp)
+            result.append({name : new_values})
+    return result
     
 def hw2_4(args):
     slang_device = spy.create_device()
@@ -366,28 +404,72 @@ def hw2_4(args):
     # HW 2.4 TODO: implement this (basically the same as 2.3)
     # change np.zeros into the right matrices
     projection = np.zeros((4, 4), dtype=np.float32)
+    projection[0][0] = 1;
+    projection[1][1] = 1;
+    projection[2][3] = 1;
+    projection[3][2] = -1;
     camera_to_screen = np.zeros((4, 4), dtype=np.float32)
+    # use camera.cam_to_world
+    camera_to_screen[0][0] = width / (2 * camera.s * a)
+    camera_to_screen[0][1] = 0
+    camera_to_screen[0][2] = 0
+    camera_to_screen[0][3] = width / 2
+
+    camera_to_screen[1][0] = 0
+    camera_to_screen[1][1] = - height / (2 * camera.s)
+    camera_to_screen[1][2] = 0
+    camera_to_screen[1][3] = height / 2
+
+    camera_to_screen[2][2] = 1
+    camera_to_screen[3][3] = 1
+
+
+  
+
 
     def render_frame(command_encoder, t):
         t = t % scene.duration
         # HW 2.4 TODO: insert your code here and fill in world_to_screen
         # by using interpolate_transformation to compute the view matrix at time t
-        world_to_screen = np.zeros((4, 4), dtype=np.float32)
+        cameraTransforms = interpolate_transformation(camera.transform_keyframes, t)
+        print(f"cameraTransforms at time {t} is")
+        print(cameraTransforms)
         
+        baseCameraToWorld = camera.cam_to_world
+        if len(cameraTransforms) >0:
+            baseCameraToWorld = hw2_scene.compose_transformations(cameraTransforms)
+        
+        
+        # world to camera
+        view_matrix = np.linalg.inv(baseCameraToWorld)
+        world_to_screen = camera_to_screen @ projection @ view_matrix
+    
         screen_vertices_list = []
         inv_depth_list = []
         for mesh in scene.meshes:
-            # HW 2.4 TODO: insert your code here and fill in the MVP matrix
-            # by using interpolate_transformation to compute the model matrix at time t
-            MVP = np.zeros((4, 4), dtype=np.float32)
+            # HW 2.3: implement this
+            # change np.zeros into the right matrix
+            # use mesh.model_matrix
+            MVP = world_to_screen @ mesh.model_matrix
             ones = np.ones((mesh.vertices.shape[0], 1), dtype=mesh.vertices.dtype)
             vertices = np.concatenate(
                 [mesh.vertices, ones],
                 axis=1
             )
-            # HW 2.4 TODO: insert your code here (basically the same as 2.3)
-            inv_depth_list.append(np.ascontiguousarray(vertices[:, 2]))
-            screen_vertices_list.append(np.ascontiguousarray(vertices[:, :2]))
+            verticeAfterApplyingMVP = MVP @ np.transpose(vertices)
+            verticeAfterApplyingMVP = np.transpose(verticeAfterApplyingMVP)
+            verticeAfterApplyingHomoGenousDivision = verticeAfterApplyingMVP / verticeAfterApplyingMVP[:, 3:4]
+    
+            # transform vertices using MVP & homogeneous coordinates division
+            # The resulting vertices should contain
+            # (screen_x, screen_y, inverse_depth).
+            # inverse_depth should be positive
+            # ---
+            # HW 2.3: your code here
+            # ---
+            inv_depth_list.append(np.ascontiguousarray(verticeAfterApplyingHomoGenousDivision[:, 2]))
+            screen_vertices_list.append(np.ascontiguousarray(verticeAfterApplyingHomoGenousDivision[:, :2]))
+        
 
         
         # Clear color buffer
@@ -410,6 +492,27 @@ def hw2_4(args):
             for tri_id in range(mesh.faces.shape[0]):
                 # HW 2.4 TODO: implement this
                 # (basically the same as HW 2.2 & 2.3)
+                sp0VertexIndex = mesh.faces[tri_id][0]
+                sp1VertexIndex = mesh.faces[tri_id][1]
+                sp2VertexIndex = mesh.faces[tri_id][2]
+
+
+                sp0 = screen_vertices[sp0VertexIndex]
+                sp1 = screen_vertices[sp1VertexIndex]
+                sp2 = screen_vertices[sp2VertexIndex]
+
+
+
+                inv_depth0 = inv_depth[sp0VertexIndex]
+                inv_depth1 = inv_depth[sp1VertexIndex]
+                inv_depth2 = inv_depth[sp2VertexIndex]
+
+                c0 = mesh.vertex_colors[sp0VertexIndex]
+                c1 = mesh.vertex_colors[sp1VertexIndex]
+                c2 = mesh.vertex_colors[sp2VertexIndex]
+
+                aabb_min = (math.floor(min(sp0[0],sp1[0], sp2[0])), math.floor(min(sp0[1],sp1[1], sp2[1])))
+                aabb_max = (math.ceil(max(sp0[0],sp1[0], sp2[0])), math.ceil(max(sp0[1],sp1[1], sp2[1])))
 
                 if aabb_min[0] > aabb_max[0] or aabb_min[1] > aabb_max[1]:
                     continue
