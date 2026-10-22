@@ -344,6 +344,12 @@ def hw2_3(args):
 
 Transform = dict[str, list[float]]
 KeyFrame = dict
+def lerp_value(a, b, s):
+    if isinstance(a, dict):
+        return {k: lerp_value(a[k], b[k], s) for k in a}
+    if isinstance(a, (list, tuple)):
+        return [lerp_value(x, y, s) for x, y in zip(a, b)]
+    return (1 - s) * a + s * b
 
 def interpolate_transformation(transform_keyframes : list[KeyFrame], t: float) -> list[Transform]:
     # TODO: your code here
@@ -361,7 +367,7 @@ def interpolate_transformation(transform_keyframes : list[KeyFrame], t: float) -
         edgeTransform : list[Transform] = transform_keyframes[edgeIndex]['transform']
         for item in edgeTransform:
             for name, values in item.items():
-                result.append({name : list(values)})
+                result.append({name : lerp_value(values, values, 0)})
         return result
 
     interpolationStartIndex : int = 0
@@ -381,12 +387,7 @@ def interpolate_transformation(transform_keyframes : list[KeyFrame], t: float) -
         name : str
         values : list[float]
         for name, values in startTransformInfo.items():
-            endValues : list[float] = endTransformInfo[name]
-            new_values : list[float] = []
-            for j in range(len(values)):
-                interp : float = (1 - interpolationValue) * values[j] + interpolationValue * endValues[j]
-                new_values.append(interp)
-            result.append({name : new_values})
+            result.append({name: lerp_value(values, endTransformInfo[name], interpolationValue)})
     return result
     
 def hw2_4(args):
@@ -432,8 +433,8 @@ def hw2_4(args):
         # HW 2.4 TODO: insert your code here and fill in world_to_screen
         # by using interpolate_transformation to compute the view matrix at time t
         cameraTransforms = interpolate_transformation(camera.transform_keyframes, t)
-        print(f"cameraTransforms at time {t} is")
-        print(cameraTransforms)
+        # print(f"cameraTransforms at time {t} is")
+        # print(cameraTransforms)
         
         baseCameraToWorld = camera.cam_to_world
         if len(cameraTransforms) >0:
@@ -450,7 +451,13 @@ def hw2_4(args):
             # HW 2.3: implement this
             # change np.zeros into the right matrix
             # use mesh.model_matrix
-            MVP = world_to_screen @ mesh.model_matrix
+            baseModelMatrix = mesh.model_matrix
+
+            animationTransforms = interpolate_transformation(mesh.transform_keyframes, t)
+            if (len(animationTransforms)) > 0:
+                baseModelMatrix = hw2_scene.compose_transformations(animationTransforms)
+
+            MVP = world_to_screen @ baseModelMatrix
             ones = np.ones((mesh.vertices.shape[0], 1), dtype=mesh.vertices.dtype)
             vertices = np.concatenate(
                 [mesh.vertices, ones],
