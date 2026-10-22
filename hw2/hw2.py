@@ -209,9 +209,24 @@ def hw2_3(args):
     projection[3][2] = -1;
     camera_to_screen = np.zeros((4, 4), dtype=np.float32)
     # use camera.cam_to_world
-    print(camera.cam_to_world)
-    view_matrix = np.zeros((4, 4), dtype=np.float32)
-    world_to_screen = np.zeros((4, 4), dtype=np.float32)
+    camera_to_screen[0][0] = width / (2 * camera.s * a)
+    camera_to_screen[0][1] = 0
+    camera_to_screen[0][2] = 0
+    camera_to_screen[0][3] = width / 2
+    
+    camera_to_screen[1][0] = 0
+    camera_to_screen[1][1] = - height / (2 * camera.s)
+    camera_to_screen[1][2] = 0
+    camera_to_screen[1][3] = height / 2
+    
+    camera_to_screen[2][2] = 1
+    camera_to_screen[3][3] = 1
+    
+    
+    # world to camera
+    view_matrix = np.linalg.inv(camera.cam_to_world)
+    
+    world_to_screen = camera_to_screen @ projection @ view_matrix
 
     
     
@@ -221,12 +236,16 @@ def hw2_3(args):
         # HW 2.3: implement this
         # change np.zeros into the right matrix
         # use mesh.model_matrix
-        MVP = camera_to_screen @ world_to_screen
+        MVP = world_to_screen @ mesh.model_matrix
         ones = np.ones((mesh.vertices.shape[0], 1), dtype=mesh.vertices.dtype)
         vertices = np.concatenate(
             [mesh.vertices, ones],
             axis=1
         )
+        print("vertices are")
+        print(vertices)
+        asdf = MVP @ np.transpose(vertices)
+        print(asdf)
         # transform vertices using MVP & homogeneous coordinates division
         # The resulting vertices should contain
         # (screen_x, screen_y, inverse_depth).

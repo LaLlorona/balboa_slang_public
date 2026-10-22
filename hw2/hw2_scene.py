@@ -1,4 +1,6 @@
 import json
+from dis import Positions
+
 import numpy as np
 import math
 import os
@@ -223,9 +225,35 @@ def compose_transformations(transformations):
             translateMatrix = np.eye(4, dtype = np.float32)
             translateMatrix[0, 3] = transformValue[0]
             translateMatrix[1, 3] = transformValue[1]
-            translateMatrix[2, 3] = transformValue[1]
+            translateMatrix[2, 3] = transformValue[2]
             F = translateMatrix @ F
             
+        if (transformType == 'lookat'):
+            camPosition = np.array(transformValue['position'])
+            camTarget = np.array(transformValue['target'])
+            camUp = np.array(transformValue['up'])
+            d = camTarget - camPosition
+            d = d / np.linalg.norm(d)
+            right = np.cross(d, camUp)
+            right = right / np.linalg.norm(right)
+            up = np.cross(right, d)
+            lookAtMatrix = np.eye(4, dtype = np.float32)
+            lookAtMatrix[0][0] = right[0]
+            lookAtMatrix[1][0] = right[1]
+            lookAtMatrix[2][0] = right[2]
+            
+            lookAtMatrix[0][1] = up[0]
+            lookAtMatrix[1][1] = up[1]
+            lookAtMatrix[2][1] = up[2]
+
+            lookAtMatrix[0][2] = -d[0]
+            lookAtMatrix[1][2] = -d[1]
+            lookAtMatrix[2][2] = -d[2]
+
+            lookAtMatrix[0][3] = camPosition[0]
+            lookAtMatrix[1][3] = camPosition[1]
+            lookAtMatrix[2][3] = camPosition[2]
+            F = lookAtMatrix @ F
 
     return F
 
