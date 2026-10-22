@@ -242,10 +242,10 @@ def hw2_3(args):
             [mesh.vertices, ones],
             axis=1
         )
-        print("vertices are")
-        print(vertices)
-        asdf = MVP @ np.transpose(vertices)
-        print(asdf)
+        verticeAfterApplyingMVP = MVP @ np.transpose(vertices)
+        verticeAfterApplyingMVP = np.transpose(verticeAfterApplyingMVP)
+        verticeAfterApplyingHomoGenousDivision = verticeAfterApplyingMVP / verticeAfterApplyingMVP[:, 3:4]
+        
         # transform vertices using MVP & homogeneous coordinates division
         # The resulting vertices should contain
         # (screen_x, screen_y, inverse_depth).
@@ -253,8 +253,9 @@ def hw2_3(args):
         # ---
         # HW 2.3: your code here
         # ---
-        inv_depth_list.append(np.ascontiguousarray(vertices[:, 2]))
-        screen_vertices_list.append(np.ascontiguousarray(vertices[:, :2]))
+        inv_depth_list.append(np.ascontiguousarray(verticeAfterApplyingHomoGenousDivision[:, 2]))
+        screen_vertices_list.append(np.ascontiguousarray(verticeAfterApplyingHomoGenousDivision[:, :2]))
+
 
     def render(command_encoder, vars, img):
         # Clear color buffer
@@ -289,9 +290,9 @@ def hw2_3(args):
                 
 
                 
-                inv_depth0 = 1 / -mesh.vertices[sp0VertexIndex][2]
-                inv_depth1 = 1 / -mesh.vertices[sp1VertexIndex][2]
-                inv_depth2 = 1 / -mesh.vertices[sp2VertexIndex][2]
+                inv_depth0 = inv_depth[sp0VertexIndex]
+                inv_depth1 = inv_depth[sp1VertexIndex]
+                inv_depth2 = inv_depth[sp2VertexIndex]
                 
                 c0 = mesh.vertex_colors[sp0VertexIndex]
                 c1 = mesh.vertex_colors[sp1VertexIndex]
