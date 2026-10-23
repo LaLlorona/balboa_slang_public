@@ -1077,15 +1077,25 @@ def hw2_7(args):
         t = t % scene.duration
         # HW 2.7 TODO: compute cam_to_world and view matrix
         # remember to handle animation if keyframes exist
-        cam_to_world = np.zeros((4, 4), dtype=np.float32)
-        view_matrix = np.zeros((4, 4), dtype=np.float32)
 
+        cameraTransforms = interpolate_transformation(camera.transform_keyframes, t)
+        baseCameraToWorld = camera.cam_to_world
+        if len(cameraTransforms) >0:
+            baseCameraToWorld = hw2_scene.compose_transformations(cameraTransforms)
+        cam_to_world = baseCameraToWorld
+        view_matrix = np.linalg.inv(baseCameraToWorld)
         render_pass = command_encoder.begin_render_pass(render_pass_desc)
 
         for mesh, gpu_mesh, Kd_texture in zip(scene.meshes, gpu_meshes, Kd_textures):
             # HW 2.7 TODO: compute the model matrix
             # remember to handle animation if keyframes exist
-            model_matrix = np.zeros((4, 4), dtype=np.float32)
+
+            baseModelMatrix = mesh.model_matrix
+
+            animationTransforms = interpolate_transformation(mesh.transform_keyframes, t)
+            if (len(animationTransforms)) > 0:
+                baseModelMatrix = hw2_scene.compose_transformations(animationTransforms)
+            model_matrix = baseModelMatrix
 
             normal_matrix = np.linalg.inv(model_matrix[:3, :3]).T
             normal_matrix = np.asarray(normal_matrix, dtype=np.float32)
