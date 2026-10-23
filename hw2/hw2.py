@@ -633,12 +633,37 @@ def hw2_5(args):
     # HW 2.5 TODO: implement this (basically the same as 2.3 and 2.4)
     # change np.zeros into the right matrices
     projection = np.zeros((4, 4), dtype=np.float32)
+    projection[0][0] = 1;
+    projection[1][1] = 1;
+    projection[2][3] = 1;
+    projection[3][2] = -1;
     camera_to_screen = np.zeros((4, 4), dtype=np.float32)
+    camera_to_screen[0][0] = width / (2 * camera.s * a)
+    camera_to_screen[0][1] = 0
+    camera_to_screen[0][2] = 0
+    camera_to_screen[0][3] = width / 2
+
+    camera_to_screen[1][0] = 0
+    camera_to_screen[1][1] = - height / (2 * camera.s)
+    camera_to_screen[1][2] = 0
+    camera_to_screen[1][3] = height / 2
+
+    camera_to_screen[2][2] = 1
+    camera_to_screen[3][3] = 1
 
     def render_frame(command_encoder, t):
         t = t % scene.duration
         # HW 2.5 TODO: implement this (basically the same as 2.4)
-        world_to_screen = np.zeros((4, 4), dtype=np.float32)
+
+        cameraTransforms = interpolate_transformation(camera.transform_keyframes, t)
+        baseCameraToWorld = camera.cam_to_world
+        if len(cameraTransforms) >0:
+            baseCameraToWorld = hw2_scene.compose_transformations(cameraTransforms)
+
+
+        # world to camera
+        view_matrix = np.linalg.inv(baseCameraToWorld)
+        world_to_screen = camera_to_screen @ projection @ view_matrix
 
         command_encoder.clear_texture_float(
             color_image,
@@ -648,12 +673,19 @@ def hw2_5(args):
                                    1.0)
         )
 
+
         # Transform the vertices per mesh because each mesh
         # has a different model matrix
         for mesh, offset in zip(scene.meshes, vertex_offsets):
             # HW 2.5 TODO: implement this (basically the same as 2.4)
-            MVP = np.zeros((4, 4), dtype=np.float32)
-            transform_vertices_shader.kernel.dispatch(\
+            baseModelMatrix = mesh.model_matrix
+
+            animationTransforms = interpolate_transformation(mesh.transform_keyframes, t)
+            if (len(animationTransforms)) > 0:
+                baseModelMatrix = hw2_scene.compose_transformations(animationTransforms)
+            MVP = world_to_screen @ baseModelMatrix
+            #dispatch per every mesh
+            transform_vertices_shader.kernel.dispatch(
                 thread_count=[mesh.vertices.shape[0], 1, 1],
                 command_encoder=command_encoder,
                 num_vertices=mesh.vertices.shape[0],
@@ -670,9 +702,11 @@ def hw2_5(args):
             depth_buffer=depth_buffer.storage,
             triangle_id_buffer=triangle_id_buffer.storage)
 
+        # wait until operationa above finished
         command_encoder.global_barrier()
+    
 
-        rasterize_depth_shader.kernel.dispatch(\
+        rasterize_depth_shader.kernel.dispatch(
             thread_count=[num_faces, 1, 1],
             command_encoder=command_encoder,
             num_triangles=num_faces,
