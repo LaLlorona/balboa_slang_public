@@ -878,14 +878,23 @@ def hw2_6(args):
         t = t % scene.duration
         # HW 2.6 TODO: compute the view matrix
         # remember to handle animation if keyframes exist
-        view_matrix = np.zeros((4, 4), dtype=np.float32)
+        cameraTransforms = interpolate_transformation(camera.transform_keyframes, t)
+        baseCameraToWorld = camera.cam_to_world
+        if len(cameraTransforms) >0:
+            baseCameraToWorld = hw2_scene.compose_transformations(cameraTransforms)
+        view_matrix = np.linalg.inv(baseCameraToWorld)
 
         render_pass = command_encoder.begin_render_pass(render_pass_desc)
 
         for mesh, gpu_mesh in zip(scene.meshes, gpu_meshes):
             # HW 2.6 TODO: compute the model matrix
             # remember to handle animation if keyframes exist
-            model_matrix = np.zeros((4, 4), dtype=np.float32)
+            baseModelMatrix = mesh.model_matrix
+
+            animationTransforms = interpolate_transformation(mesh.transform_keyframes, t)
+            if (len(animationTransforms)) > 0:
+                baseModelMatrix = hw2_scene.compose_transformations(animationTransforms)
+            model_matrix = baseModelMatrix
 
             MVP = clip_projection @ view_matrix @ model_matrix
 
