@@ -27,7 +27,6 @@ def hw3_1(args):
         for obj in scene['objects']
         if obj['type'] == 'sphere'
     ]
-
     bindings = {
         'background': spy.float3(background),
         'spheres': buffer.create_structured_buffer(
