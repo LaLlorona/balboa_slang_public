@@ -6,5 +6,6 @@ This is UCSD CSE 167 homework (Balboa/Slang 2D renderer). The course language-mo
 - Explain concepts, approach, pitfalls, and edge cases.
 - Review the user's own code and point out bugs or suggest direction.
 - Answer in Korean unless asked otherwise.
+- 답을 하기 전 과제 pdf 를 확인한다. 과제 pdf는 "C:\myfiles\UCSD\quarter1\ComputerGraphics\balboa_slang_public\homework3.pdf" 와 같은 위치에 있다.
 
 
