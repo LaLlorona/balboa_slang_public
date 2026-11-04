@@ -46,14 +46,123 @@ def compose_transformations(transformations):
     # HW 3.4: copy paste your HW2.3 code here
 
     F = np.eye(4, dtype=np.float32)
+    for transform in transformations:
+        (transformType, transformValue), = transform.items()
+
+        if (transformType == 'scale'):
+            scaleMatrix = np.eye(4, dtype = np.float32)
+            scaleMatrix[0, 0] = transformValue[0]
+            scaleMatrix[1, 1] = transformValue[1]
+            scaleMatrix[2, 2] = transformValue[2]
+            F = scaleMatrix @ F
+
+        if (transformType == 'rotate_x'):
+            rotateMatrix = np.eye(4, dtype = np.float32)
+            rotateMatrix[1, 1] = np.cos(math.radians(transformValue[0]))
+            rotateMatrix[1, 2] = -np.sin(math.radians(transformValue[0]))
+            rotateMatrix[2, 1] = np.sin(math.radians(transformValue[0]))
+            rotateMatrix[2, 2] = np.cos(math.radians(transformValue[0]))
+            F = rotateMatrix @ F
+        if (transformType == 'rotate_y'):
+            rotateMatrix = np.eye(4, dtype = np.float32)
+            rotateMatrix[0, 0] = np.cos(math.radians(transformValue[0]))
+            rotateMatrix[0, 2] = np.sin(math.radians(transformValue[0]))
+            rotateMatrix[2, 0] = -np.sin(math.radians(transformValue[0]))
+            rotateMatrix[2, 2] = np.cos(math.radians(transformValue[0]))
+            F = rotateMatrix @ F
+        if (transformType == 'rotate_z'):
+            rotateMatrix = np.eye(4, dtype = np.float32)
+            rotateMatrix[0, 0] = np.cos(math.radians(transformValue[0]))
+            rotateMatrix[0, 1] = -np.sin(math.radians(transformValue[0]))
+            rotateMatrix[1, 0] = np.sin(math.radians(transformValue[0]))
+            rotateMatrix[1, 1] = np.cos(math.radians(transformValue[0]))
+            F = rotateMatrix @ F
+
+
+        if (transformType == 'translate'):
+            translateMatrix = np.eye(4, dtype = np.float32)
+            translateMatrix[0, 3] = transformValue[0]
+            translateMatrix[1, 3] = transformValue[1]
+            translateMatrix[2, 3] = transformValue[2]
+            F = translateMatrix @ F
+
+        if (transformType == 'lookat'):
+            camPosition = np.array(transformValue['position'])
+            camTarget = np.array(transformValue['target'])
+            camUp = np.array(transformValue['up'])
+            d = camTarget - camPosition
+            d = d / np.linalg.norm(d)
+            right = np.cross(d, camUp)
+            right = right / np.linalg.norm(right)
+            up = np.cross(right, d)
+            lookAtMatrix = np.eye(4, dtype = np.float32)
+            lookAtMatrix[0][0] = right[0]
+            lookAtMatrix[1][0] = right[1]
+            lookAtMatrix[2][0] = right[2]
+
+            lookAtMatrix[0][1] = up[0]
+            lookAtMatrix[1][1] = up[1]
+            lookAtMatrix[2][1] = up[2]
+
+            lookAtMatrix[0][2] = -d[0]
+            lookAtMatrix[1][2] = -d[1]
+            lookAtMatrix[2][2] = -d[2]
+
+            lookAtMatrix[0][3] = camPosition[0]
+            lookAtMatrix[1][3] = camPosition[1]
+            lookAtMatrix[2][3] = camPosition[2]
+            F = lookAtMatrix @ F
+
     return F
+Transform = dict[str, list[float]]
+KeyFrame = dict
+def lerp_value(a, b, s):
+    if isinstance(a, dict):
+        return {k: lerp_value(a[k], b[k], s) for k in a}
+    if isinstance(a, (list, tuple)):
+        return [lerp_value(x, y, s) for x, y in zip(a, b)]
+    return (1 - s) * a + s * b
 
 def interpolate_transformation(transform_keyframes, t):
     # HW 3.4: copy your HW2.4 code here.
 
     # create a new transform from the two keyframes
-    interp_transforms = []
-    return interp_transforms
+    if (len(transform_keyframes) == 0):
+        return []
+
+
+    start_time : float = transform_keyframes[0]['time']
+    end_time : float = transform_keyframes[len(transform_keyframes)-1]['time']
+    
+    result : list[Transform] = []
+    
+    if t <= start_time or t >= end_time :
+        edgeIndex : int = 0 if t <= start_time else len(transform_keyframes) - 1
+        edgeTransform : list[Transform] = transform_keyframes[edgeIndex]['transform']
+        for item in edgeTransform:
+            for name, values in item.items():
+                result.append({name : lerp_value(values, values, 0)})
+        return result
+    
+    interpolationStartIndex : int = 0
+    for i in range(0, len(transform_keyframes) - 1, 1):
+        intervalStartTime : float = transform_keyframes[i]['time']
+        intervalEndTime : float = transform_keyframes[i + 1]['time']
+        if intervalStartTime <= t and t < intervalEndTime :
+            interpolationStartIndex = i
+            break
+    
+    interpolationStartInfo = transform_keyframes[interpolationStartIndex]
+    interpolationEndInfo = transform_keyframes[interpolationStartIndex + 1]
+    interpolationValue : float = (t - interpolationStartInfo['time']) / (interpolationEndInfo['time'] - interpolationStartInfo['time'])
+    startTransformInfo : Transform
+    endTransformInfo : Transform
+    for startTransformInfo, endTransformInfo in zip(interpolationStartInfo['transform'], interpolationEndInfo['transform']) :
+        name : str
+        values : list[float]
+        for name, values in startTransformInfo.items():
+            result.append({name: lerp_value(values, endTransformInfo[name], interpolationValue)})
+    return result
 
 def get_transformation(obj, t):
     transforms = obj.get('transform', [])
