@@ -320,6 +320,9 @@ def upload_scene(filename, module, slang_device, use_bvh = False):
             'obj_to_world': obj_to_world
         })
 
+
+    print(shapes)    
+
     lights = scene['lights']
 
     max_depth = scene.get('max_depth', 20)
