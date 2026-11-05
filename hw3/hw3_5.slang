@@ -31,6 +31,69 @@ bool IsSphereCollidingWithARay(Sphere sphere, float3 from, float3 rayDirection, 
     t = -1;
     return false;
 }
+
+bool IsMeshCollidingWithARay(Shape currentShape,
+                             int shapeIndex,
+                             float tMax,
+                             float3 rayOriginAtObjectSpace,
+                             float3 rayDirectionAtObjectSpace,
+                             StructuredBuffer<TriangleMesh> triangleMesh,
+                             StructuredBuffer<uint3> triangles,
+                             StructuredBuffer<float3> vertices,
+                             StructuredBuffer<float3> vertex_normals,
+                             out HitInformation outPuthitInformation)
+{
+    TriangleMesh currentTriangleMesh = triangleMesh[currentShape.index];
+    float tCandidiate = float.maxValue;
+    HitInformation hitInformation = HitInformation(0, 0, float3(0));
+    float3 vertexNormal1OfClosestPoint = 0;
+    float3 vertexNormal2OfClosestPoint = 0;
+    float3 vertexNormal3OfClosestPoint = 0;
+    float3 bOfClosestPoint;
+    for (int j = currentTriangleMesh.triangle_begin; j < currentTriangleMesh.triangle_end; j++)
+    {
+        uint3 triangleIndices = triangles[j] + currentTriangleMesh.vertex_offset;
+        float3 vertexPos1 = vertices[triangleIndices[0]];
+        float3 vertexPos2 = vertices[triangleIndices[1]];
+        float3 vertexPos3 = vertices[triangleIndices[2]];
+
+        float tValue;
+        float3 b;
+
+        if (intersect_tri(vertexPos1, vertexPos2, vertexPos3, rayOriginAtObjectSpace, rayDirectionAtObjectSpace, EPSILON, tMax, b, tValue))
+        {
+            if (tValue < tCandidiate)
+            {
+                vertexNormal1OfClosestPoint = vertex_normals[triangleIndices[0]];
+                vertexNormal2OfClosestPoint = vertex_normals[triangleIndices[1]];
+                vertexNormal3OfClosestPoint = vertex_normals[triangleIndices[2]];
+                bOfClosestPoint = b;
+                tCandidiate = tValue;
+            }
+        }
+    }
+    if (tCandidiate != float.maxValue)
+    {
+        float3 rayHitPointAtObjectSpace = tCandidiate * rayDirectionAtObjectSpace + rayOriginAtObjectSpace;
+        float3 normalDirectionAtObjectSpace = 
+        vertexNormal1OfClosestPoint * bOfClosestPoint[0] +
+        vertexNormal2OfClosestPoint * bOfClosestPoint[1] +
+        vertexNormal3OfClosestPoint * bOfClosestPoint[2];
+        float3 normalDirectionAtWorldSpace = normalize(xform_vec(transpose(currentShape.world_to_obj), normalDirectionAtObjectSpace));
+        hitInformation = HitInformation(tCandidiate, shapeIndex, normalDirectionAtWorldSpace);
+        outPuthitInformation = hitInformation;
+        return true;
+    }
+    outPuthitInformation = hitInformation;
+    return false;
+}
+
+struct HitInformation
+{
+    float t;
+    int shapeIndex;
+    float3 worldCoordinateNormalOfRayHit;
+}
 bool TryFindRayHitPoint(float3 rayStartPoint,
                         float3 normalizedRayDirection,
                         int num_shapes,
@@ -40,12 +103,10 @@ bool TryFindRayHitPoint(float3 rayStartPoint,
                         StructuredBuffer<uint3> triangles,
                         StructuredBuffer<float3> vertices,
                         StructuredBuffer<float3> vertex_normals,
-                        out float t,
-                        out int toDrawShapeIndex,
-                        out float3 getWorldNormalDirectionOfRayHitPoint)
+                        out HitInformation outPuthitInformation)
 {
     float tCandidiate = float.maxValue;
-    int shapeToDrawIndex = -1;
+    HitInformation hitInformation;
     for (int i = 0; i < num_shapes; i++)
     {
         // check whether ray hits the sphere
@@ -55,67 +116,48 @@ bool TryFindRayHitPoint(float3 rayStartPoint,
         if (currentShape.type == ShapeType.Sphere)
         {
             Sphere sphere = spheres[shapes[i].index];
-            float3 sphereCenter = sphere.center;
-            float radius = sphere.radius;
-            float3 OMinusXc = rayStartPoint - sphereCenter;
             float tValue;
 
             if (IsSphereCollidingWithARay(sphere, rayOriginAtObjectSpace, rayDirectionAtObjectSpace, float.maxValue, tValue))
             {
                 if (tValue < tCandidiate)
                 {
-                    shapeToDrawIndex = i;
+                    float3 rayHitPointAtObjectSpace = tValue * rayDirectionAtObjectSpace + rayOriginAtObjectSpace;
+                    float3 normalDirectionAtObjectSpace = rayHitPointAtObjectSpace - sphere.center;
+                    float3 normalDirectionAtWorldSpace = normalize(xform_vec(transpose(currentShape.world_to_obj), normalDirectionAtObjectSpace));
+                    hitInformation = HitInformation(tValue, i, normalDirectionAtWorldSpace);
                     tCandidiate = tValue;
                 }
             }
         }
         else if (currentShape.type == ShapeType.TriangleMesh)
         {
-            TriangleMesh currentTriangleMesh = triangleMesh[currentShape.index];
-            for (int j = currentTriangleMesh.triangle_begin; j < currentTriangleMesh.triangle_end; j++)
+            HitInformation temporaryHitInformationForMesh;
+            if (IsMeshCollidingWithARay(currentShape,
+                                        i,
+                                        float.maxValue,
+                                        rayOriginAtObjectSpace,
+                                        rayDirectionAtObjectSpace,
+                                        triangleMesh,
+                                        triangles,
+                                        vertices,
+                                        vertex_normals,
+                                        temporaryHitInformationForMesh))
             {
-                uint3 triangleIndices = triangles[j] + currentTriangleMesh.vertex_offset;
-                float3 vertexPos1 = vertices[triangleIndices[0]];
-                float3 vertexPos2 = vertices[triangleIndices[1]];
-                float3 vertexPos3 = vertices[triangleIndices[2]];
-
-                float3 vertexNormal1 = vertex_normals[triangleIndices[0]];
-                float3 vertexNormal2 = vertex_normals[triangleIndices[1]];
-                float3 vertexNormal3 = vertex_normals[triangleIndices[2]];
-                float tValue;
-                float3 b;
-                if (intersect_tri(vertexPos1, vertexPos2, vertexPos3, rayOriginAtObjectSpace, rayDirectionAtObjectSpace, EPSILON, float.maxValue, b, tValue))
+                if (temporaryHitInformationForMesh.t < tCandidiate)
                 {
-                    if (tValue < tCandidiate)
-                    {
-
-                        shapeToDrawIndex = i;
-                        tCandidiate = tValue;
-                    }
+                    hitInformation = temporaryHitInformationForMesh;
+                    tCandidiate = temporaryHitInformationForMesh.t;
                 }
             }
         }
     }
-
-    // start from here: 11042026
-    if (shapeToDrawIndex != -1)
+    if (tCandidiate != float.maxValue)
     {
-        t = tCandidiate;
-        toDrawShapeIndex = shapeToDrawIndex;
-
-        Shape closestShape = shapes[toDrawShapeIndex];
-        float3 rayOriginAtObjectSpace = xform_pt(closestShape.world_to_obj, rayStartPoint);
-        float3 rayDirectionAtObjectSpace = xform_vec(closestShape.world_to_obj, normalizedRayDirection);
-        float3 rayHitPointAtObjectSpace = t * rayDirectionAtObjectSpace + rayOriginAtObjectSpace;
-        float3 normalDirectionAtObjectSpace = rayHitPointAtObjectSpace - spheres[closestShape.index].center;
-        float3 normalDirectionAtWorldSpace = normalize(xform_vec(transpose(closestShape.world_to_obj), normalDirectionAtObjectSpace));
-
-        getWorldNormalDirectionOfRayHitPoint = normalDirectionAtWorldSpace;
+        outPuthitInformation = hitInformation;
         return true;
     }
-    t = float.maxValue;
-    toDrawShapeIndex = -1;
-    getWorldNormalDirectionOfRayHitPoint = float3(0);
+    outPuthitInformation = hitInformation;
     return false;
 }
 
@@ -127,6 +169,10 @@ float3 CalculateContributionOfSingleRay(
     StructuredBuffer<PointLight> lights,
     int num_shapes,
     StructuredBuffer<Sphere> spheres,
+    StructuredBuffer<TriangleMesh> triangleMesh,
+    StructuredBuffer<uint3> triangles,
+    StructuredBuffer<float3> vertices,
+    StructuredBuffer<float3> vertex_normals,
     StructuredBuffer<Shape> shapes)
 {
     float3 color = 0;
@@ -141,18 +187,37 @@ float3 CalculateContributionOfSingleRay(
         // shadow check
         for (int j = 0; j < num_shapes; j++)
         {
-
             Shape otherShape = shapes[j];
-            Sphere otherSphere = spheres[shapes[j].index];
-
             float3 rayHitPointFromObjectSpaceOfOtherShape = xform_pt(otherShape.world_to_obj, rayHitPoint);
             float3 rayDirectionFromObjectSapceOfOtherShape = xform_vec(otherShape.world_to_obj, toLights);
-
             float t;
-            if (IsSphereCollidingWithARay(otherSphere, rayHitPointFromObjectSpaceOfOtherShape, rayDirectionFromObjectSapceOfOtherShape, distanceBetweenPointandLight, t))
+            if (otherShape.type == ShapeType.Sphere)
             {
-                colorByLight = float3(0, 0, 0);
-                break;
+                Sphere otherSphere = spheres[shapes[j].index];
+                if (IsSphereCollidingWithARay(otherSphere, rayHitPointFromObjectSpaceOfOtherShape, rayDirectionFromObjectSapceOfOtherShape, distanceBetweenPointandLight, t))
+                {
+                    colorByLight = float3(0, 0, 0);
+                    break;
+                }
+            }
+            if (otherShape.type == ShapeType.TriangleMesh)
+            {
+                TriangleMesh currentTriangleMesh = triangleMesh[otherShape.index];
+                HitInformation temporaryHitInformation;
+                if (IsMeshCollidingWithARay(otherShape,
+                                            j,
+                                            distanceBetweenPointandLight,
+                                            rayHitPointFromObjectSpaceOfOtherShape,
+                                            rayDirectionFromObjectSapceOfOtherShape,
+                                            triangleMesh,
+                                            triangles,
+                                            vertices,
+                                            vertex_normals,
+                                            temporaryHitInformation))
+                {
+                    colorByLight = float3(0, 0, 0);
+                    break;
+                }
             }
         }
         color += colorByLight;
@@ -199,38 +264,51 @@ void compute_main(uint2 tid: SV_DispatchThreadID,
 
     float3 worldCoordinateCameraPosition = xform_pt(camera.cam_to_world, cameraPosition);
     float3 worldCoordinateNormalizedCameraForwardDirection = normalize(xform_vec(camera.cam_to_world, normalizedCameraPositionToPixelDirection));
-
-    float tCandidiate = float.maxValue;
-    int shapeToDrawIndex = -1;
-
     float3 color = 0;
     float3 throughput = 1.0;
     float3 rayOrigin = worldCoordinateCameraPosition;
     float3 rayDirection = worldCoordinateNormalizedCameraForwardDirection;
     for (int j = 0; j < max_depth; j++)
     {
-        tCandidiate = float.maxValue;
-        shapeToDrawIndex = -1;
-        float3 worldNormalDirectionOfHitPoint = float3(0);
-        bool rayHitResult = TryFindRayHitPoint(rayOrigin, rayDirection, num_shapes, shapes, spheres, tCandidiate, shapeToDrawIndex, worldNormalDirectionOfHitPoint);
+        HitInformation hitInformation;
+        bool rayHitResult =
+        TryFindRayHitPoint(rayOrigin,
+            rayDirection,
+            num_shapes,
+            shapes,
+            spheres,
+            meshes,
+            triangles,
+            vertices,
+            vertex_normals,
+            hitInformation);
         if (rayHitResult)
         {
-            Shape shapeToDraw = shapes[shapeToDrawIndex];
-            Sphere sphereToDraw = spheres[shapes[shapeToDrawIndex].index];
-            float3 raySphereIntersectionCoordinate = rayOrigin + rayDirection * tCandidiate;
-            float3 sphereCenter = sphereToDraw.center;
+            Shape shapeToDraw = shapes[hitInformation.shapeIndex];
+            float3 raySphereIntersectionCoordinate = rayOrigin + rayDirection * hitInformation.t;
 
             // we have to calculate normal
             color +=
                 throughput *
-                CalculateContributionOfSingleRay(raySphereIntersectionCoordinate, worldNormalDirectionOfHitPoint, shapeToDraw, num_lights, lights, num_shapes, spheres, shapes);
+                CalculateContributionOfSingleRay(raySphereIntersectionCoordinate,
+                    hitInformation.worldCoordinateNormalOfRayHit,
+                    shapeToDraw,
+                    num_lights,
+                    lights,
+                    num_shapes,
+                    spheres,
+                    meshes,
+                    triangles,
+                    vertices,
+                    vertex_normals,
+                    shapes);
 
             if ((shapeToDraw.Kr.x > 0 || shapeToDraw.Kr.y > 0 || shapeToDraw.Kr.z > 0) == false)
             {
                 break;
             }
             rayOrigin = raySphereIntersectionCoordinate;
-            rayDirection = reflect(rayDirection, worldNormalDirectionOfHitPoint);
+            rayDirection = reflect(rayDirection, hitInformation.worldCoordinateNormalOfRayHit);
             throughput *= shapeToDraw.Kr;
         }
         else
