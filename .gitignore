@@ -10,4 +10,4 @@ output.png
 *.fdb_latexmk
 
 latex.out/
-pdf/
+pdf/*.zip
